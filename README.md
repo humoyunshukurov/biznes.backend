@@ -11,6 +11,12 @@ npx prisma migrate dev
 npm run start:dev
 ```
 
+Namuna ma'lumotlar bilan to'ldirish uchun (admin foydalanuvchi allaqachon ro'yxatdan o'tgan bo'lishi kerak):
+
+```bash
+npm run db:seed
+```
+
 ## Modullar
 
 - Auth - JWT ro'yxatdan o'tish/kirish
