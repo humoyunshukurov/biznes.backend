@@ -1,7 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ProductService } from './product.service';
-import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
+import { ProductService, generateEan13 } from './product.service';
+import {
+  CreateProductDto,
+  ImportProductsDto,
+  UpdateProductDto,
+} from './dto/product.dto';
+
+const userIdOf = (req: Request) => (req.user as { userId: string }).userId;
 
 @UseGuards(JwtAuthGuard)
 @Controller('products')
@@ -13,19 +30,38 @@ export class ProductController {
     return this.productService.findAll();
   }
 
+  @Get('generate-barcode')
+  generateBarcode() {
+    return { barcode: generateEan13() };
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.productService.findOne(id);
   }
 
   @Post()
-  create(@Body() dto: CreateProductDto) {
-    return this.productService.create(dto);
+  create(@Body() dto: CreateProductDto, @Req() req: Request) {
+    return this.productService.create(dto, userIdOf(req));
+  }
+
+  @Post('import')
+  import(@Body() dto: ImportProductsDto, @Req() req: Request) {
+    return this.productService.import(dto, userIdOf(req));
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateProductDto) {
-    return this.productService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+    @Req() req: Request,
+  ) {
+    return this.productService.update(id, dto, userIdOf(req));
+  }
+
+  @Patch(':id/favorite')
+  toggleFavorite(@Param('id') id: string) {
+    return this.productService.toggleFavorite(id);
   }
 
   @Delete(':id')

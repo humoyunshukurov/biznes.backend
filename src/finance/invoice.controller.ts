@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { InvoiceService } from './invoice.service';
 import { CreateInvoiceDto } from './dto/invoice.dto';
@@ -21,5 +29,10 @@ export class InvoiceController {
   @Post()
   create(@Body() dto: CreateInvoiceDto) {
     return this.invoiceService.create(dto);
+  }
+
+  @Patch(':id/cancel')
+  cancel(@Param('id') id: string) {
+    return this.invoiceService.cancel(id);
   }
 }

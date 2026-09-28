@@ -4,3 +4,6 @@ dist
 .env
 
 /generated/prisma
+
+# Yuklangan mahsulot rasmlari
+/uploads

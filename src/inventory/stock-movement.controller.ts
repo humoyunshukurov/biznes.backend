@@ -2,7 +2,9 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { StockMovementService } from './stock-movement.service';
-import { CreateStockMovementDto } from './dto/stock-movement.dto';
+import { CreateStockMovementDto, RevisionDto } from './dto/stock-movement.dto';
+
+const userIdOf = (req: Request) => (req.user as { userId: string }).userId;
 
 @UseGuards(JwtAuthGuard)
 @Controller('stock-movements')
@@ -16,7 +18,11 @@ export class StockMovementController {
 
   @Post()
   create(@Body() dto: CreateStockMovementDto, @Req() req: Request) {
-    const userId = (req.user as { userId: string }).userId;
-    return this.stockMovementService.create(dto, userId);
+    return this.stockMovementService.create(dto, userIdOf(req));
+  }
+
+  @Post('revision')
+  revision(@Body() dto: RevisionDto, @Req() req: Request) {
+    return this.stockMovementService.revision(dto, userIdOf(req));
   }
 }

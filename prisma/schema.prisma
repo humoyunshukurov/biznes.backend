@@ -25,9 +25,57 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  stockMovements   StockMovement[]
+  orders           Order[]
+  expenses         Expense[]
+  shifts           Shift[]
+  supplierPayments SupplierPayment[]
+}
+
+// Kompaniya, chek va printer sozlamalari (kalit -> JSON qiymat)
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  address   String?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   stockMovements StockMovement[]
-  orders         Order[]
-  expenses       Expense[]
+  payments       SupplierPayment[]
+}
+
+model SupplierPayment {
+  id         String        @id @default(cuid())
+  supplierId String
+  amount     Decimal       @db.Decimal(14, 2)
+  method     PaymentMethod
+  note       String?
+  userId     String
+  paidAt     DateTime      @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@index([supplierId])
+}
+
+model Shift {
+  id       String    @id @default(cuid())
+  userId   String
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 model Category {
@@ -39,22 +87,79 @@ model Category {
   products Product[]
 }
 
-model Product {
-  id         String   @id @default(cuid())
-  name       String
-  sku        String   @unique
-  unit       String
-  price      Decimal  @db.Decimal(14, 2)
-  quantity   Int      @default(0)
-  categoryId String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+model Unit {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  category       Category        @relation(fields: [categoryId], references: [id])
+  products Product[]
+}
+
+model Brand {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
+model ProductType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  products Product[]
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  name           String
+  sku            String?  @unique
+  description    String?
+  imageUrl       String?
+  price          Decimal  @db.Decimal(14, 2)
+  wholesalePrice Decimal? @db.Decimal(14, 2)
+  costPrice      Decimal? @db.Decimal(14, 2)
+  markupPercent  Decimal? @db.Decimal(7, 2)
+  roundTo        Int?
+  quantity       Decimal  @default(0) @db.Decimal(14, 3)
+  ikpu           String?
+  unitCode       String?
+  vatRate        Int?
+  isMarked       Boolean  @default(false)
+  isWeighted     Boolean  @default(false)
+  isFavorite     Boolean  @default(false)
+  unitId         String
+  categoryId     String?
+  brandId        String?
+  productTypeId  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  unit           Unit             @relation(fields: [unitId], references: [id])
+  category       Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand          Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  productType    ProductType?     @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
+  barcodes       ProductBarcode[]
   stockMovements StockMovement[]
   orderItems     OrderItem[]
 
   @@index([categoryId])
+  @@index([brandId])
+  @@index([unitId])
+}
+
+model ProductBarcode {
+  id        String @id @default(cuid())
+  code      String @unique
+  productId String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
 }
 
 enum StockMovementType {
@@ -63,19 +168,25 @@ enum StockMovementType {
 }
 
 model StockMovement {
-  id        String            @id @default(cuid())
-  productId String
-  type      StockMovementType
-  quantity  Int
-  note      String?
-  userId    String
-  createdAt DateTime          @default(now())
+  id         String            @id @default(cuid())
+  productId  String
+  type       StockMovementType
+  quantity   Decimal           @db.Decimal(14, 3)
+  // Yetkazib beruvchidan kirim/qaytarishda bir birlik narxi
+  unitCost   Decimal?          @db.Decimal(14, 2)
+  supplierId String?
+  note       String?
+  userId     String
+  createdAt  DateTime          @default(now())
 
-  product Product @relation(fields: [productId], references: [id])
-  user    User    @relation(fields: [userId], references: [id])
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user     User      @relation(fields: [userId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
 
   @@index([productId])
   @@index([userId])
+  @@index([supplierId])
+  @@index([createdAt])
 }
 
 model Customer {
@@ -115,14 +226,17 @@ model Order {
 
   @@index([customerId])
   @@index([userId])
+  @@index([createdAt])
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   orderId   String
   productId String
   quantity  Int
-  price     Decimal @db.Decimal(14, 2)
+  price     Decimal  @db.Decimal(14, 2)
+  // Sotuv paytidagi tan narxi: foydani to'g'ri hisoblash uchun
+  costPrice Decimal? @db.Decimal(14, 2)
 
   order   Order   @relation(fields: [orderId], references: [id])
   product Product @relation(fields: [productId], references: [id])
