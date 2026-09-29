@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CloseShiftDto, OpenShiftDto } from './shift.dto';
 import { ShiftService } from './shift.service';
 
 type AuthUser = { userId: string; role: string };
@@ -23,12 +24,12 @@ export class ShiftController {
   }
 
   @Post('open')
-  open(@Req() req: Request) {
-    return this.shiftService.open(userOf(req).userId);
+  open(@Body() dto: OpenShiftDto, @Req() req: Request) {
+    return this.shiftService.open(userOf(req).userId, dto);
   }
 
   @Post('close')
-  close(@Req() req: Request) {
-    return this.shiftService.close(userOf(req).userId);
+  close(@Body() dto: CloseShiftDto, @Req() req: Request) {
+    return this.shiftService.close(userOf(req).userId, dto);
   }
 }

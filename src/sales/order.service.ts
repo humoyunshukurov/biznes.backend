@@ -216,6 +216,7 @@ export class OrderService {
           customerId: order.customerId,
           userId,
           total,
+          refundMethod: dto.refundMethod,
           note: dto.note?.trim() || null,
           items: { create: lines },
         },

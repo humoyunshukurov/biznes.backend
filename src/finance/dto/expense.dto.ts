@@ -1,6 +1,8 @@
 import { Trim } from '../../common/transforms';
+import { PaymentMethod } from '../../../generated/prisma/client';
 import {
   IsDateString,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -25,4 +27,9 @@ export class CreateExpenseDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  // Qaysi hisobdan to'landi (standart: naqd)
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  method?: PaymentMethod;
 }

@@ -29,6 +29,14 @@ export class CategoryService {
     return this.prisma.category.update({ where: { id }, data: dto });
   }
 
+  async toggleFavorite(id: string) {
+    const category = await this.findOne(id);
+    return this.prisma.category.update({
+      where: { id },
+      data: { isFavorite: !category.isFavorite },
+    });
+  }
+
   async remove(id: string) {
     await this.findOne(id);
     return this.prisma.category.delete({ where: { id } });

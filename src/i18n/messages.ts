@@ -328,6 +328,21 @@ export const messages = {
     en: 'This supplier has deliveries or payments and cannot be deleted',
     ru: 'У поставщика есть приходы или оплаты, удалить нельзя',
   },
+  'cash.transferAccounts': {
+    uz: "O'tkazma uchun ikki xil hisob tanlang",
+    en: 'Choose two different accounts for a transfer',
+    ru: 'Для перевода выберите два разных счёта',
+  },
+  'cash.insufficient': {
+    uz: "Hisobda yetarli mablag' yo'q (mavjud: {available})",
+    en: 'Not enough money on the account (available: {available})',
+    ru: 'Недостаточно средств на счёте (доступно: {available})',
+  },
+  'cash.notFound': {
+    uz: 'Kassa yozuvi topilmadi',
+    en: 'Cash record not found',
+    ru: 'Кассовая запись не найдена',
+  },
   'shift.alreadyOpen': {
     uz: 'Smena allaqachon ochiq',
     en: 'A shift is already open',

@@ -9,7 +9,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { OrderStatus } from '../../../generated/prisma/client';
+import { OrderStatus, PaymentMethod } from '../../../generated/prisma/client';
 
 export class CreateOrderItemDto {
   @IsString()
@@ -47,4 +47,9 @@ export class CreateReturnDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  // Mijozga pul qaysi usulda qaytarildi (standart: naqd)
+  @IsOptional()
+  @IsEnum(PaymentMethod)
+  refundMethod?: PaymentMethod;
 }

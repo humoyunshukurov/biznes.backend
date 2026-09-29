@@ -31,6 +31,35 @@ model User {
   shifts           Shift[]
   supplierPayments SupplierPayment[]
   customerReturns  CustomerReturn[]
+  payments         Payment[]
+  cashTransactions CashTransaction[]
+}
+
+enum CashType {
+  IN
+  OUT
+  TRANSFER
+}
+
+// Kassaga qo'lda kiritilgan kirim, chiqim va hisoblar orasidagi o'tkazmalar
+model CashTransaction {
+  id          String         @id @default(cuid())
+  number      Int            @unique @default(autoincrement())
+  type        CashType
+  amount      Decimal        @db.Decimal(14, 2)
+  // Hisob (o'tkazmada - qaysi hisobdan)
+  method      PaymentMethod
+  // Faqat o'tkazmada - qaysi hisobga
+  toMethod    PaymentMethod?
+  // Tayyor kod (SALES, OPENING, ...) yoki erkin matn
+  category    String?
+  description String?
+  userId      String
+  createdAt   DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
 }
 
 // Kompaniya, chek va printer sozlamalari (kalit -> JSON qiymat)
@@ -69,10 +98,14 @@ model SupplierPayment {
 }
 
 model Shift {
-  id       String    @id @default(cuid())
-  userId   String
-  openedAt DateTime  @default(now())
-  closedAt DateTime?
+  id           String    @id @default(cuid())
+  userId       String
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  // Kassadagi naqd pul: ochilishda sanalgan, yopilishda kutilgan va sanalgan
+  openingCash  Decimal?  @db.Decimal(14, 2)
+  expectedCash Decimal?  @db.Decimal(14, 2)
+  closingCash  Decimal?  @db.Decimal(14, 2)
 
   user User @relation(fields: [userId], references: [id])
 
@@ -80,10 +113,14 @@ model Shift {
 }
 
 model Category {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(cuid())
+  // Asosiy (o'zbekcha) nom; nameEn/nameRu bo'lsa tanlangan tilda ko'rsatiladi
+  name       String
+  nameEn     String?
+  nameRu     String?
+  isFavorite Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   products Product[]
 }
@@ -254,13 +291,15 @@ model Order {
 
 // Mijozdan tovar qaytarish (buyurtmaning bir qismi yoki hammasi)
 model CustomerReturn {
-  id         String   @id @default(cuid())
-  orderId    String
-  customerId String
-  userId     String
-  total      Decimal  @db.Decimal(14, 2)
-  note       String?
-  createdAt  DateTime @default(now())
+  id           String        @id @default(cuid())
+  orderId      String
+  customerId   String
+  userId       String
+  total        Decimal       @db.Decimal(14, 2)
+  // Mijozga pul qaysi usulda qaytarilgan
+  refundMethod PaymentMethod @default(CASH)
+  note         String?
+  createdAt    DateTime      @default(now())
 
   order    Order                @relation(fields: [orderId], references: [id])
   customer Customer             @relation(fields: [customerId], references: [id])
@@ -340,20 +379,24 @@ model Payment {
   method    PaymentMethod
   paidAt    DateTime      @default(now())
   note      String?
+  userId    String?
 
   invoice Invoice @relation(fields: [invoiceId], references: [id])
+  user    User?   @relation(fields: [userId], references: [id])
 
   @@index([invoiceId])
 }
 
 model Expense {
-  id          String   @id @default(cuid())
+  id          String        @id @default(cuid())
   category    String
-  amount      Decimal  @db.Decimal(14, 2)
+  amount      Decimal       @db.Decimal(14, 2)
   description String?
-  date        DateTime @default(now())
+  date        DateTime      @default(now())
+  // Qaysi hisobdan to'langan (kassa uchun)
+  method      PaymentMethod @default(CASH)
   userId      String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime      @default(now())
 
   user User @relation(fields: [userId], references: [id])
 

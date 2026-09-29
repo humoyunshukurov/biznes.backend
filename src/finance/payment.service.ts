@@ -8,7 +8,7 @@ import { InvoiceStatus } from '../../generated/prisma/client';
 export class PaymentService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreatePaymentDto) {
+  async create(dto: CreatePaymentDto, userId: string) {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: dto.invoiceId },
       include: { payments: true },
@@ -28,7 +28,7 @@ export class PaymentService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const payment = await tx.payment.create({ data: dto });
+      const payment = await tx.payment.create({ data: { ...dto, userId } });
 
       const paidTotal = paidBefore + dto.amount;
       const status =

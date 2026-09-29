@@ -18,6 +18,7 @@ export class ExpenseService {
         amount: dto.amount,
         description: dto.description,
         date: dto.date ? new Date(dto.date) : undefined,
+        method: dto.method,
         userId,
       },
     });

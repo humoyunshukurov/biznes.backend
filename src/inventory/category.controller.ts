@@ -37,6 +37,11 @@ export class CategoryController {
     return this.categoryService.update(id, dto);
   }
 
+  @Patch(':id/favorite')
+  toggleFavorite(@Param('id') id: string) {
+    return this.categoryService.toggleFavorite(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.categoryService.remove(id);

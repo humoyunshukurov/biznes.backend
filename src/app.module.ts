@@ -9,6 +9,7 @@ import { ShiftModule } from './shift/shift.module';
 import { SettingsModule } from './settings/settings.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { StatsModule } from './stats/stats.module';
+import { CashModule } from './cash/cash.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { StatsModule } from './stats/stats.module';
     SettingsModule,
     SuppliersModule,
     StatsModule,
+    CashModule,
   ],
 })
 export class AppModule {}

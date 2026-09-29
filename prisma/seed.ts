@@ -54,6 +54,8 @@ async function main() {
   await prisma.supplierPayment.deleteMany();
   await prisma.supplier.deleteMany();
   await prisma.expense.deleteMany();
+  await prisma.cashTransaction.deleteMany();
+  await prisma.shift.deleteMany();
   await prisma.productBarcode.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
@@ -92,18 +94,26 @@ async function main() {
     await prisma.productType.create({ data: { name } });
 
   console.log('Seeding categories...');
-  const categoryNames = [
-    'Sement va qorishmalar',
-    'Metall va armatura',
-    "Bo'yoq va emulsiya",
-    "G'isht va bloklar",
-    'Pol qoplamalari',
-    'Izolyatsiya materiallari',
-    'Mahkamlash vositalari',
+  // [o'zbekcha, inglizcha, ruscha, sevimli]
+  const categoryDefs: [string, string, string, boolean][] = [
+    ['Sement va qorishmalar', 'Cement and mortars', 'Цемент и смеси', true],
+    ['Metall va armatura', 'Metal and rebar', 'Металл и арматура', false],
+    ["Bo'yoq va emulsiya", 'Paints and emulsions', 'Краски и эмульсии', true],
+    ["G'isht va bloklar", 'Bricks and blocks', 'Кирпич и блоки', false],
+    ['Pol qoplamalari', 'Floor coverings', 'Напольные покрытия', false],
+    [
+      'Izolyatsiya materiallari',
+      'Insulation materials',
+      'Изоляционные материалы',
+      false,
+    ],
+    ['Mahkamlash vositalari', 'Fasteners', 'Крепёж', true],
   ];
   const categories: Record<string, string> = {};
-  for (const name of categoryNames) {
-    const cat = await prisma.category.create({ data: { name } });
+  for (const [name, nameEn, nameRu, isFavorite] of categoryDefs) {
+    const cat = await prisma.category.create({
+      data: { name, nameEn, nameRu, isFavorite },
+    });
     categories[name] = cat.id;
   }
 
@@ -655,33 +665,140 @@ async function main() {
   const expenseDefs = [
     {
       category: 'Ijara',
+      method: PaymentMethod.BANK_TRANSFER,
+      daysAgo: 20,
       amount: 18000000,
       description: "Chilonzor omborining oylik ijara to'lovi",
     },
     {
       category: 'Oylik maosh',
+      method: PaymentMethod.CARD,
+      daysAgo: 10,
       amount: 28500000,
       description: 'Omborxona xodimlarining oylik ish haqi',
     },
     {
       category: 'Logistika',
+      method: PaymentMethod.CASH,
+      daysAgo: 6,
       amount: 12400000,
       description: 'Yuk tashish va tushirish xarajatlari',
     },
     {
       category: 'Kommunal',
+      method: PaymentMethod.BANK_TRANSFER,
+      daysAgo: 3,
       amount: 4200000,
       description: "Elektr energiyasi va kommunal to'lovlar",
     },
     {
       category: 'Marketing',
+      method: PaymentMethod.CARD,
+      daysAgo: 1,
       amount: 3500000,
       description: 'Ijtimoiy tarmoqlarda reklama',
     },
   ];
-  for (const e of expenseDefs) {
-    await prisma.expense.create({ data: { ...e, userId: admin.id } });
+  for (const { daysAgo, ...e } of expenseDefs) {
+    await prisma.expense.create({
+      data: {
+        ...e,
+        date: new Date(Date.now() - daysAgo * 24 * 3600 * 1000),
+        userId: admin.id,
+      },
+    });
   }
+
+  console.log('Seeding cash register...');
+  // Har bir hisobga boshlang'ich qoldiq: barcha chiqimlardan keyin ham musbat qolishi uchun
+  const DAY_MS = 24 * 3600 * 1000;
+  const sumBy = async (method: PaymentMethod) => {
+    const [pay, exp, sup, ref] = await Promise.all([
+      prisma.payment.aggregate({ where: { method }, _sum: { amount: true } }),
+      prisma.expense.aggregate({ where: { method }, _sum: { amount: true } }),
+      prisma.supplierPayment.aggregate({
+        where: { method },
+        _sum: { amount: true },
+      }),
+      prisma.customerReturn.aggregate({
+        where: { refundMethod: method },
+        _sum: { total: true },
+      }),
+    ]);
+    return (
+      Number(pay._sum.amount ?? 0) -
+      Number(exp._sum.amount ?? 0) -
+      Number(sup._sum.amount ?? 0) -
+      Number(ref._sum.total ?? 0)
+    );
+  };
+  const buffer: Record<PaymentMethod, number> = {
+    CASH: 15000000,
+    CARD: 10000000,
+    BANK_TRANSFER: 50000000,
+  };
+  for (const method of [
+    PaymentMethod.CASH,
+    PaymentMethod.CARD,
+    PaymentMethod.BANK_TRANSFER,
+  ]) {
+    const net = await sumBy(method);
+    await prisma.cashTransaction.create({
+      data: {
+        type: 'IN',
+        amount: Math.max(0, -net) + buffer[method],
+        method,
+        category: 'OPENING',
+        userId: admin.id,
+        createdAt: new Date(Date.now() - 40 * DAY_MS),
+      },
+    });
+  }
+  await prisma.cashTransaction.create({
+    data: {
+      type: 'IN',
+      amount: 2500000,
+      method: PaymentMethod.CASH,
+      category: 'SALES',
+      userId: admin.id,
+      createdAt: new Date(Date.now() - 2 * DAY_MS),
+    },
+  });
+  await prisma.cashTransaction.create({
+    data: {
+      type: 'OUT',
+      amount: 5000000,
+      method: PaymentMethod.CASH,
+      category: 'COLLECTION',
+      userId: admin.id,
+      createdAt: new Date(Date.now() - 2 * DAY_MS + 3600000),
+    },
+  });
+  await prisma.cashTransaction.create({
+    data: {
+      type: 'TRANSFER',
+      amount: 3000000,
+      method: PaymentMethod.CASH,
+      toMethod: PaymentMethod.BANK_TRANSFER,
+      userId: admin.id,
+      createdAt: new Date(Date.now() - 1 * DAY_MS),
+    },
+  });
+  // Kecha yopilgan namuna smena (naqd pul hisobi bilan)
+  const yesterday = new Date(Date.now() - DAY_MS);
+  yesterday.setHours(9, 0, 0, 0);
+  const closed = new Date(yesterday);
+  closed.setHours(19, 0, 0, 0);
+  await prisma.shift.create({
+    data: {
+      userId: admin.id,
+      openedAt: yesterday,
+      closedAt: closed,
+      openingCash: 1500000,
+      expectedCash: 1500000,
+      closingCash: 1480000,
+    },
+  });
 
   console.log('Done.');
 }
