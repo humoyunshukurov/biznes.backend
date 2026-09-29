@@ -28,6 +28,11 @@ export class StatsController {
     return this.stats.customerBalances();
   }
 
+  @Get('income')
+  income(@Query() q: RangeQueryDto) {
+    return this.stats.income(q);
+  }
+
   @Get('reorder')
   reorder(@Query() q: ReorderQueryDto) {
     return this.stats.reorder(q);

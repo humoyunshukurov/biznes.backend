@@ -137,6 +137,7 @@ export class PosService {
             amount: p.amount,
             method: p.method,
             userId,
+            kind: 'POS',
           },
         });
       }

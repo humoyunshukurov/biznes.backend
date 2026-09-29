@@ -103,7 +103,7 @@ export class CashService {
   }
 
   // Davr ichidagi barcha pul harakatlari (eng yangisi birinchi)
-  private async entries(from: Date, to: Date): Promise<LedgerEntry[]> {
+  async entries(from: Date, to: Date): Promise<LedgerEntry[]> {
     const range = { gte: from, lt: to };
     const [payments, expenses, supplierPayments, refunds, manual] =
       await Promise.all([
@@ -149,7 +149,8 @@ export class CashService {
         amount: num(p.amount),
         method: p.method,
         toMethod: null,
-        category: 'CUSTOMER_PAYMENT',
+        // Kassadagi savdo to'lovi - savdo tushumi, qolganlari - mijoz qarzini to'lashi
+        category: p.kind === 'POS' ? 'SALES' : 'CUSTOMER_PAYMENT',
         categoryText: p.invoice.customer.name,
         description: p.note,
         deletable: false,

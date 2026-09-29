@@ -23,6 +23,11 @@ export class ShiftController {
     return this.shiftService.current(userOf(req).userId);
   }
 
+  @Get('current/report')
+  report(@Req() req: Request) {
+    return this.shiftService.report(userOf(req).userId);
+  }
+
   @Post('open')
   open(@Body() dto: OpenShiftDto, @Req() req: Request) {
     return this.shiftService.open(userOf(req).userId, dto);

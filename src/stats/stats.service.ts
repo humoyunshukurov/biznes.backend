@@ -519,4 +519,142 @@ export class StatsService {
       totalCost: round2(rows.reduce((s, r) => s + (r.estimatedCost ?? 0), 0)),
     };
   }
+  // Daromad: tanlangan davr (odatda bir oy) bo'yicha savdo, tannarx, foyda, xarajatlar va sof foyda
+  async income(q: RangeQueryDto) {
+    const { from, to } = parseRange(q);
+    const tzMs = (q.tz ?? 0) * 60 * 1000;
+    // Mahalliy vaqt bo'yicha n oy oldingi sana
+    const shiftMonths = (d: Date, n: number) => {
+      const local = new Date(d.getTime() - tzMs);
+      local.setUTCMonth(local.getUTCMonth() + n);
+      return new Date(local.getTime() + tzMs);
+    };
+    const monthKey = (d: Date) => {
+      const local = new Date(d.getTime() - tzMs);
+      return `${local.getUTCFullYear()}-${local.getUTCMonth()}`;
+    };
+    const prevFrom = shiftMonths(from, -1);
+    const historyFrom = shiftMonths(from, -5);
+
+    const [orders, returns, expenses] = await Promise.all([
+      this.ordersInRange(historyFrom, to),
+      this.returnsInRange(historyFrom, to),
+      this.prisma.expense.findMany({
+        where: { date: { gte: historyFrom, lt: to } },
+        select: { amount: true, category: true, date: true },
+      }),
+    ]);
+
+    const inRange = <T>(rows: T[], get: (r: T) => Date, a: Date, b: Date) =>
+      rows.filter((r) => get(r) >= a && get(r) < b);
+
+    const summarize = (a: Date, b: Date) => {
+      const t = this.totals(
+        inRange(orders, (o) => o.createdAt, a, b),
+        inRange(returns, (r) => r.createdAt, a, b),
+      );
+      const exp = inRange(expenses, (e) => e.date, a, b).reduce(
+        (s, e) => s + Number(e.amount),
+        0,
+      );
+      // Tannarxi ma'lum mahsulotlar savdosidan yalpi foyda ayrilsa - tannarx
+      const cost = round2(t.revenue - t.revenueWithoutCost - t.profit);
+      return {
+        sales: round2(t.revenue + t.returnsTotal),
+        returns: t.returnsTotal,
+        revenue: t.revenue,
+        cost: Math.max(0, cost),
+        grossProfit: t.profit,
+        revenueWithoutCost: t.revenueWithoutCost,
+        expenses: round2(exp),
+        netProfit: round2(t.profit - exp),
+        count: t.count,
+        avgCheck: t.avgCheck,
+      };
+    };
+
+    const current = summarize(from, to);
+    const previous = summarize(prevFrom, from);
+
+    const byCategory = new Map<string, number>();
+    for (const e of inRange(expenses, (x) => x.date, from, to)) {
+      byCategory.set(
+        e.category,
+        (byCategory.get(e.category) ?? 0) + Number(e.amount),
+      );
+    }
+
+    // Kunlar bo'yicha
+    const dayCount = Math.min(
+      62,
+      Math.ceil((to.getTime() - from.getTime()) / DAY),
+    );
+    const days = Array.from({ length: dayCount }, (_, i) => ({
+      day: i + 1,
+      revenue: 0,
+      profit: 0,
+      expenses: 0,
+    }));
+    const dayOf = (d: Date) =>
+      days[Math.floor((d.getTime() - from.getTime()) / DAY)];
+    for (const o of inRange(orders, (x) => x.createdAt, from, to)) {
+      const b = dayOf(o.createdAt);
+      if (!b) continue;
+      b.revenue += Number(o.totalAmount);
+      for (const it of o.items)
+        if (it.costPrice !== null)
+          b.profit += (Number(it.price) - Number(it.costPrice)) * it.quantity;
+    }
+    for (const r of inRange(returns, (x) => x.createdAt, from, to)) {
+      const b = dayOf(r.createdAt);
+      if (!b) continue;
+      b.revenue -= Number(r.total);
+      for (const it of r.items)
+        if (it.costPrice !== null)
+          b.profit -= (Number(it.price) - Number(it.costPrice)) * it.quantity;
+    }
+    for (const e of inRange(expenses, (x) => x.date, from, to)) {
+      const b = dayOf(e.date);
+      if (b) b.expenses += Number(e.amount);
+    }
+
+    // Oxirgi 6 oy
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const a = shiftMonths(from, i - 5);
+      const b = i === 5 ? to : shiftMonths(from, i - 4);
+      const s = summarize(a, b);
+      const local = new Date(a.getTime() - tzMs);
+      return {
+        key: monthKey(a),
+        year: local.getUTCFullYear(),
+        month: local.getUTCMonth() + 1,
+        revenue: s.revenue,
+        grossProfit: s.grossProfit,
+        expenses: s.expenses,
+        netProfit: s.netProfit,
+      };
+    });
+
+    return {
+      ...current,
+      changes: {
+        revenue: change(current.revenue, previous.revenue),
+        grossProfit: change(current.grossProfit, previous.grossProfit),
+        expenses: change(current.expenses, previous.expenses),
+        netProfit: change(current.netProfit, previous.netProfit),
+      },
+      previous,
+      expenseByCategory: [...byCategory.entries()]
+        .map(([category, amount]) => ({ category, amount: round2(amount) }))
+        .sort((a, b) => b.amount - a.amount),
+      days: days.map((d) => ({
+        ...d,
+        revenue: round2(d.revenue),
+        profit: round2(d.profit),
+        expenses: round2(d.expenses),
+        net: round2(d.profit - d.expenses),
+      })),
+      months,
+    };
+  }
 }
