@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { pickLang } from '../i18n/messages';
 import { ProductService, generateEan13 } from './product.service';
 import {
   CreateProductDto,
@@ -47,7 +48,11 @@ export class ProductController {
 
   @Post('import')
   import(@Body() dto: ImportProductsDto, @Req() req: Request) {
-    return this.productService.import(dto, userIdOf(req));
+    return this.productService.import(
+      dto,
+      userIdOf(req),
+      pickLang(req.headers['accept-language']),
+    );
   }
 
   @Patch(':id')

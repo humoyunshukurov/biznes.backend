@@ -1,10 +1,7 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest, notFound } from '../i18n/app-error';
 import { PrismaService } from '../prisma/prisma.service';
-import { StockMovementType } from '../../generated/prisma/client';
+import { MovementKind, StockMovementType } from '../../generated/prisma/client';
 import {
   CreateSupplierDto,
   SupplierPaymentDto,
@@ -88,7 +85,7 @@ export class SuppliersService {
 
   async findOne(id: string) {
     const supplier = await this.prisma.supplier.findUnique({ where: { id } });
-    if (!supplier) throw new NotFoundException('Yetkazib beruvchi topilmadi');
+    if (!supplier) throw notFound('supplier.notFound');
     return supplier;
   }
 
@@ -128,15 +125,13 @@ export class SuppliersService {
       this.prisma.supplierPayment.count({ where: { supplierId: id } }),
     ]);
     if (movements + payments > 0) {
-      throw new BadRequestException(
-        "Bu yetkazib beruvchida kirim yoki to'lovlar bor, uni o'chirib bo'lmaydi",
-      );
+      throw badRequest('supplier.hasRecords');
     }
     return this.prisma.supplier.delete({ where: { id } });
   }
 
   async receive(id: string, dto: SupplierStockDto, userId: string) {
-    const supplier = await this.findOne(id);
+    await this.findOne(id);
     await this.assertProducts(dto);
     await this.prisma.$transaction(async (tx) => {
       for (const item of dto.items) {
@@ -144,10 +139,11 @@ export class SuppliersService {
           data: {
             productId: item.productId,
             type: StockMovementType.IN,
+            kind: MovementKind.SUPPLIER_IN,
             quantity: item.quantity,
             unitCost: item.unitCost,
             supplierId: id,
-            note: dto.note?.trim() || `Kirim: ${supplier.name}`,
+            note: dto.note?.trim() || null,
             userId,
           },
         });
@@ -166,14 +162,15 @@ export class SuppliersService {
   }
 
   async returnGoods(id: string, dto: SupplierStockDto, userId: string) {
-    const supplier = await this.findOne(id);
+    await this.findOne(id);
     const products = await this.assertProducts(dto);
     for (const item of dto.items) {
       const p = products.get(item.productId)!;
       if (Number(p.quantity) < item.quantity) {
-        throw new BadRequestException(
-          `"${p.name}" uchun omborda yetarli qoldiq yo'q (mavjud: ${Number(p.quantity)})`,
-        );
+        throw badRequest('stock.notEnough', {
+          name: p.name,
+          available: Number(p.quantity),
+        });
       }
     }
     await this.prisma.$transaction(async (tx) => {
@@ -182,10 +179,11 @@ export class SuppliersService {
           data: {
             productId: item.productId,
             type: StockMovementType.OUT,
+            kind: MovementKind.SUPPLIER_RETURN,
             quantity: item.quantity,
             unitCost: item.unitCost,
             supplierId: id,
-            note: dto.note?.trim() || `Qaytarildi: ${supplier.name}`,
+            note: dto.note?.trim() || null,
             userId,
           },
         });
@@ -211,7 +209,7 @@ export class SuppliersService {
       where: { id: { in: ids } },
     });
     if (products.length !== ids.length) {
-      throw new NotFoundException('Mahsulot topilmadi');
+      throw notFound('product.notFound');
     }
     return new Map(products.map((p) => [p.id, p]));
   }

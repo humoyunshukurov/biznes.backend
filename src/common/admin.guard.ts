@@ -1,9 +1,5 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { forbidden } from '../i18n/app-error';
 import type { Request } from 'express';
 
 // Faqat ADMIN rolidagi foydalanuvchiga ruxsat beradi (JwtAuthGuard'dan keyin qo'llanadi)
@@ -15,7 +11,7 @@ export class AdminGuard implements CanActivate {
       .getRequest<Request & { user?: { role?: string } }>();
     const role = req.user?.role;
     if (role !== 'ADMIN') {
-      throw new ForbiddenException('Bu amal faqat administrator uchun');
+      throw forbidden('auth.adminOnly');
     }
     return true;
   }

@@ -18,7 +18,7 @@ import { EmptyToNull, Trim } from '../common/transforms';
 export class CreateSupplierDto {
   @Trim()
   @IsString()
-  @MinLength(1, { message: "Nomi bo'sh bo'lmasligi kerak" })
+  @MinLength(1, { message: 'val.nameRequired' })
   name: string;
 
   @IsOptional() @EmptyToNull() @IsString() phone?: string | null;
@@ -33,17 +33,17 @@ export class SupplierItemDto {
   productId: string;
 
   @IsNumber()
-  @Min(0.001, { message: "Miqdor 0 dan katta bo'lishi kerak" })
+  @Min(0.001, { message: 'val.quantityPositive' })
   quantity: number;
 
   @IsNumber()
-  @Min(0, { message: "Narx manfiy bo'lmasligi kerak" })
+  @Min(0, { message: 'val.priceNotNegative' })
   unitCost: number;
 }
 
 export class SupplierStockDto {
   @IsArray()
-  @ArrayMinSize(1, { message: 'Kamida bitta mahsulot tanlang' })
+  @ArrayMinSize(1, { message: 'val.selectAtLeastOne' })
   @ValidateNested({ each: true })
   @Type(() => SupplierItemDto)
   items: SupplierItemDto[];
@@ -56,7 +56,7 @@ export class SupplierStockDto {
 
 export class SupplierPaymentDto {
   @IsNumber()
-  @Min(0.01, { message: "To'lov summasi 0 dan katta bo'lishi kerak" })
+  @Min(0.01, { message: 'val.amountPositive' })
   amount: number;
 
   @IsEnum(PaymentMethod)

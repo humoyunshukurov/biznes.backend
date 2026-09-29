@@ -4,7 +4,7 @@ import { IsOptional, IsString, MinLength } from 'class-validator';
 export class NamedDto {
   @Trim()
   @IsString()
-  @MinLength(1, { message: "Nomi bo'sh bo'lmasligi kerak" })
+  @MinLength(1, { message: 'val.nameRequired' })
   name: string;
 }
 

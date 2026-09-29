@@ -11,7 +11,11 @@ import {
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrderService } from './order.service';
-import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
+import {
+  CreateOrderDto,
+  CreateReturnDto,
+  UpdateOrderStatusDto,
+} from './dto/order.dto';
 
 const userIdOf = (req: Request) => (req.user as { userId: string }).userId;
 
@@ -42,5 +46,25 @@ export class OrderController {
     @Req() req: Request,
   ) {
     return this.orderService.updateStatus(id, dto, userIdOf(req));
+  }
+
+  @Post(':id/returns')
+  createReturn(
+    @Param('id') id: string,
+    @Body() dto: CreateReturnDto,
+    @Req() req: Request,
+  ) {
+    return this.orderService.createReturn(id, dto, userIdOf(req));
+  }
+}
+
+@UseGuards(JwtAuthGuard)
+@Controller('returns')
+export class ReturnController {
+  constructor(private orderService: OrderService) {}
+
+  @Get()
+  findAll() {
+    return this.orderService.findReturns();
   }
 }

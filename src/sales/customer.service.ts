@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest, notFound } from '../i18n/app-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 
@@ -16,7 +13,7 @@ export class CustomerService {
 
   async findOne(id: string) {
     const customer = await this.prisma.customer.findUnique({ where: { id } });
-    if (!customer) throw new NotFoundException('Mijoz topilmadi');
+    if (!customer) throw notFound('customer.notFound');
     return customer;
   }
 
@@ -36,9 +33,7 @@ export class CustomerService {
       this.prisma.invoice.count({ where: { customerId: id } }),
     ]);
     if (orders + invoices > 0) {
-      throw new BadRequestException(
-        `Bu mijozda ${orders} ta buyurtma va ${invoices} ta hisob-faktura bor, uni o'chirib bo'lmaydi`,
-      );
+      throw badRequest('customer.hasRecords', { orders, invoices });
     }
     return this.prisma.customer.delete({ where: { id } });
   }

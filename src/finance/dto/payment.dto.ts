@@ -6,7 +6,7 @@ export class CreatePaymentDto {
   invoiceId: string;
 
   @IsNumber()
-  @Min(0.01, { message: "To'lov summasi 0 dan katta bo'lishi kerak" })
+  @Min(0.01, { message: 'val.amountPositive' })
   amount: number;
 
   @IsEnum(PaymentMethod)

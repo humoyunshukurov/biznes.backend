@@ -1,8 +1,20 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { StockMovementService } from './stock-movement.service';
-import { CreateStockMovementDto, RevisionDto } from './dto/stock-movement.dto';
+import {
+  CreateStockMovementDto,
+  MovementQueryDto,
+  RevisionDto,
+} from './dto/stock-movement.dto';
 
 const userIdOf = (req: Request) => (req.user as { userId: string }).userId;
 
@@ -12,8 +24,8 @@ export class StockMovementController {
   constructor(private stockMovementService: StockMovementService) {}
 
   @Get()
-  findAll() {
-    return this.stockMovementService.findAll();
+  findAll(@Query() query: MovementQueryDto) {
+    return this.stockMovementService.findAll(query);
   }
 
   @Post()

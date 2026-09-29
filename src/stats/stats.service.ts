@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest } from '../i18n/app-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrderStatus } from '../../generated/prisma/client';
 import { OverviewQueryDto, RangeQueryDto, ReorderQueryDto } from './stats.dto';
@@ -9,9 +10,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 function parseRange(q: RangeQueryDto) {
   const from = new Date(q.from);
   const to = new Date(q.to);
-  if (!(from < to)) throw new BadRequestException("Sana oralig'i noto'g'ri");
+  if (!(from < to)) throw badRequest('stats.badRange');
   if (to.getTime() - from.getTime() > 400 * DAY) {
-    throw new BadRequestException("Sana oralig'i 400 kundan oshmasligi kerak");
+    throw badRequest('stats.rangeTooLong');
   }
   return { from, to };
 }
@@ -54,10 +55,39 @@ export class StatsService {
     });
   }
 
-  private totals(orders: Awaited<ReturnType<StatsService['ordersInRange']>>) {
+  // Davr ichida mijozlardan qaytarilgan tovarlar (savdodan ayiriladi)
+  private returnsInRange(from: Date, to: Date) {
+    return this.prisma.customerReturn.findMany({
+      where: { createdAt: { gte: from, lt: to } },
+      select: {
+        total: true,
+        createdAt: true,
+        items: {
+          select: {
+            productId: true,
+            quantity: true,
+            price: true,
+            costPrice: true,
+            product: {
+              select: {
+                name: true,
+                category: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  private totals(
+    orders: Awaited<ReturnType<StatsService['ordersInRange']>>,
+    returns: Awaited<ReturnType<StatsService['returnsInRange']>>,
+  ) {
     let revenue = 0;
     let profit = 0;
     let revenueWithoutCost = 0;
+    let returnsTotal = 0;
     for (const o of orders) {
       revenue += Number(o.totalAmount);
       for (const it of o.items) {
@@ -66,13 +96,24 @@ export class StatsService {
         else profit += (Number(it.price) - Number(it.costPrice)) * it.quantity;
       }
     }
+    for (const r of returns) {
+      returnsTotal += Number(r.total);
+      for (const it of r.items) {
+        const line = Number(it.price) * it.quantity;
+        if (it.costPrice === null) revenueWithoutCost -= line;
+        else profit -= (Number(it.price) - Number(it.costPrice)) * it.quantity;
+      }
+    }
+    revenue -= returnsTotal;
     const count = orders.length;
     return {
       revenue: round2(revenue),
       profit: round2(profit),
       count,
       avgCheck: count ? round2(revenue / count) : 0,
-      revenueWithoutCost: round2(revenueWithoutCost),
+      revenueWithoutCost: round2(Math.max(0, revenueWithoutCost)),
+      returnsTotal: round2(returnsTotal),
+      returnsCount: returns.length,
     };
   }
 
@@ -82,24 +123,27 @@ export class StatsService {
     const span = to.getTime() - from.getTime();
     const prevFrom = new Date(from.getTime() - span);
 
-    const [orders, prevOrders, payments, statusGroups] = await Promise.all([
-      this.ordersInRange(from, to),
-      this.ordersInRange(prevFrom, from),
-      this.prisma.payment.groupBy({
-        by: ['method'],
-        where: { paidAt: { gte: from, lt: to } },
-        _sum: { amount: true },
-      }),
-      this.prisma.order.groupBy({
-        by: ['status'],
-        where: { createdAt: { gte: from, lt: to } },
-        _count: true,
-        _sum: { totalAmount: true },
-      }),
-    ]);
+    const [orders, prevOrders, payments, statusGroups, returns, prevReturns] =
+      await Promise.all([
+        this.ordersInRange(from, to),
+        this.ordersInRange(prevFrom, from),
+        this.prisma.payment.groupBy({
+          by: ['method'],
+          where: { paidAt: { gte: from, lt: to } },
+          _sum: { amount: true },
+        }),
+        this.prisma.order.groupBy({
+          by: ['status'],
+          where: { createdAt: { gte: from, lt: to } },
+          _count: true,
+          _sum: { totalAmount: true },
+        }),
+        this.returnsInRange(from, to),
+        this.returnsInRange(prevFrom, from),
+      ]);
 
-    const current = this.totals(orders);
-    const previous = this.totals(prevOrders);
+    const current = this.totals(orders, returns);
+    const previous = this.totals(prevOrders, prevReturns);
 
     // Diagramma bo'laklari: foydalanuvchining mahalliy vaqti bo'yicha
     const bucketCount =
@@ -114,15 +158,28 @@ export class StatsService {
       profit: 0,
       count: 0,
     }));
-    for (const o of orders) {
-      const local = new Date(o.createdAt.getTime() - tzMs);
+    const bucketOf = (date: Date) => {
+      const local = new Date(date.getTime() - tzMs);
       const idx =
         q.groupBy === 'hour'
           ? local.getUTCHours()
           : q.groupBy === 'weekday'
             ? (local.getUTCDay() + 6) % 7 // Dushanba = 0
-            : Math.floor((o.createdAt.getTime() - from.getTime()) / DAY);
-      const b = buckets[idx];
+            : Math.floor((date.getTime() - from.getTime()) / DAY);
+      return buckets[idx];
+    };
+    for (const r of returns) {
+      const b = bucketOf(r.createdAt);
+      if (!b) continue;
+      b.revenue -= Number(r.total);
+      for (const it of r.items) {
+        if (it.costPrice !== null) {
+          b.profit -= (Number(it.price) - Number(it.costPrice)) * it.quantity;
+        }
+      }
+    }
+    for (const o of orders) {
+      const b = bucketOf(o.createdAt);
       if (!b) continue;
       b.revenue += Number(o.totalAmount);
       b.count += 1;
@@ -148,9 +205,14 @@ export class StatsService {
       string,
       { productId: string; name: string; quantity: number; revenue: number }
     >();
-    for (const o of orders) {
-      for (const it of o.items) {
-        const line = Number(it.price) * it.quantity;
+    // Sotuv qatorlari (+) va qaytarish qatorlari (-)
+    const lines = [
+      ...orders.flatMap((o) => o.items.map((it) => ({ it, sign: 1 }))),
+      ...returns.flatMap((r) => r.items.map((it) => ({ it, sign: -1 }))),
+    ];
+    for (const { it, sign } of lines) {
+      {
+        const line = sign * Number(it.price) * it.quantity;
         const cat = it.product.category;
         const catKey = cat?.id ?? 'none';
         const c = categories.get(catKey) ?? {
@@ -166,7 +228,7 @@ export class StatsService {
           quantity: 0,
           revenue: 0,
         };
-        p.quantity += it.quantity;
+        p.quantity += sign * it.quantity;
         p.revenue += line;
         products.set(it.productId, p);
       }
@@ -176,6 +238,7 @@ export class StatsService {
       0,
     );
     const categoryList = [...categories.values()]
+      .filter((c) => c.revenue > 0)
       .sort((a, b) => b.revenue - a.revenue)
       .map((c) => ({
         ...c,
@@ -183,6 +246,7 @@ export class StatsService {
         share: itemsRevenue ? round2((c.revenue / itemsRevenue) * 100) : 0,
       }));
     const topProducts = [...products.values()]
+      .filter((p) => p.revenue > 0)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10)
       .map((p) => ({
@@ -257,8 +321,9 @@ export class StatsService {
   // ABC tahlil: tushumning 80% i - A, keyingi 15% - B, qolgan 5% - C
   async abc(q: RangeQueryDto) {
     const { from, to } = parseRange(q);
-    const [orders, allProducts] = await Promise.all([
+    const [orders, returns, allProducts] = await Promise.all([
       this.ordersInRange(from, to),
+      this.returnsInRange(from, to),
       this.prisma.product.findMany({ select: { id: true, name: true } }),
     ]);
     const map = new Map<
@@ -279,18 +344,23 @@ export class StatsService {
         revenue: 0,
         profit: 0,
       });
-    for (const o of orders) {
-      for (const it of o.items) {
-        const row = map.get(it.productId);
-        if (!row) continue;
-        row.quantity += it.quantity;
-        row.revenue += Number(it.price) * it.quantity;
-        if (it.costPrice === null) row.profit = null;
-        else if (row.profit !== null)
-          row.profit += (Number(it.price) - Number(it.costPrice)) * it.quantity;
-      }
+    const lines = [
+      ...orders.flatMap((o) => o.items.map((it) => ({ it, sign: 1 }))),
+      ...returns.flatMap((r) => r.items.map((it) => ({ it, sign: -1 }))),
+    ];
+    for (const { it, sign } of lines) {
+      const row = map.get(it.productId);
+      if (!row) continue;
+      row.quantity += sign * it.quantity;
+      row.revenue += sign * Number(it.price) * it.quantity;
+      if (it.costPrice === null) row.profit = null;
+      else if (row.profit !== null)
+        row.profit +=
+          sign * (Number(it.price) - Number(it.costPrice)) * it.quantity;
     }
-    const rows = [...map.values()].sort((a, b) => b.revenue - a.revenue);
+    const rows = [...map.values()]
+      .map((r) => ({ ...r, revenue: Math.max(0, r.revenue) }))
+      .sort((a, b) => b.revenue - a.revenue);
     const total = rows.reduce((s, r) => s + r.revenue, 0);
     let cumulative = 0;
     const result = rows.map((r) => {
@@ -326,6 +396,7 @@ export class StatsService {
         orders: {
           select: { totalAmount: true, status: true, createdAt: true },
         },
+        returns: { select: { total: true } },
         invoices: {
           select: {
             amount: true,
@@ -337,7 +408,9 @@ export class StatsService {
     });
     const rows = customers.map((c) => {
       const active = c.orders.filter((o) => o.status !== OrderStatus.CANCELLED);
-      const ordersTotal = active.reduce((s, o) => s + Number(o.totalAmount), 0);
+      const returned = c.returns.reduce((s, r) => s + Number(r.total), 0);
+      const ordersTotal =
+        active.reduce((s, o) => s + Number(o.totalAmount), 0) - returned;
       const invoices = c.invoices.filter((i) => i.status !== 'CANCELLED');
       const invoiced = invoices.reduce((s, i) => s + Number(i.amount), 0);
       const paid = c.invoices.reduce(
@@ -354,6 +427,7 @@ export class StatsService {
         phone: c.phone,
         ordersCount: active.length,
         ordersTotal: round2(ordersTotal),
+        returned: round2(returned),
         invoiced: round2(invoiced),
         paid: round2(paid),
         debt: round2(invoiced - paid),
@@ -376,7 +450,7 @@ export class StatsService {
     const days = q.days ?? 30;
     const cover = q.cover ?? 14;
     const since = new Date(Date.now() - days * DAY);
-    const [products, sold] = await Promise.all([
+    const [products, sold, returned] = await Promise.all([
       this.prisma.product.findMany({
         include: { unit: true, category: true },
         orderBy: { name: 'asc' },
@@ -391,9 +465,24 @@ export class StatsService {
         },
         _sum: { quantity: true },
       }),
+      this.prisma.customerReturnItem.groupBy({
+        by: ['productId'],
+        where: { return: { createdAt: { gte: since } } },
+        _sum: { quantity: true },
+      }),
     ]);
+    const returnedMap = new Map(
+      returned.map((r) => [r.productId, r._sum.quantity ?? 0]),
+    );
+    // Sof sotilgan miqdor = sotilgan - qaytarilgan
     const soldMap = new Map(
-      sold.map((s) => [s.productId, s._sum.quantity ?? 0]),
+      sold.map((s) => [
+        s.productId,
+        Math.max(
+          0,
+          (s._sum.quantity ?? 0) - (returnedMap.get(s.productId) ?? 0),
+        ),
+      ]),
     );
     const rows = products
       .map((p) => {

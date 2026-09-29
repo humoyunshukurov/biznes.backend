@@ -11,11 +11,11 @@ import {
 export class CreateExpenseDto {
   @Trim()
   @IsString()
-  @MinLength(1, { message: "Toifa bo'sh bo'lmasligi kerak" })
+  @MinLength(1, { message: 'val.categoryRequired' })
   category: string;
 
   @IsNumber()
-  @Min(0.01, { message: "Summa 0 dan katta bo'lishi kerak" })
+  @Min(0.01, { message: 'val.amountPositive' })
   amount: number;
 
   @IsOptional()

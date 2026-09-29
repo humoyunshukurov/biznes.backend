@@ -25,11 +25,11 @@ export class CreateProductDto {
   unitId: string;
 
   @IsArray()
-  @ArrayMinSize(1, { message: 'Kamida bitta shtrix-kod kiriting' })
+  @ArrayMinSize(1, { message: 'val.barcodeRequired' })
   @IsString({ each: true })
   @Matches(/^\S+$/, {
     each: true,
-    message: "Shtrix-kodda bo'sh joy bo'lmasligi kerak",
+    message: 'val.barcodeSpaces',
   })
   barcodes: string[];
 
@@ -69,7 +69,7 @@ export class CreateProductDto {
   @IsOptional()
   @EmptyToNull()
   @Matches(/^\d{17}$/, {
-    message: "IKPU (MXIK) kodi 17 ta raqamdan iborat bo'lishi kerak",
+    message: 'val.ikpu',
   })
   ikpu?: string | null;
 
@@ -173,7 +173,7 @@ export class ImportProductsDto {
   mode: 'create' | 'update';
 
   @IsArray()
-  @ArrayMinSize(1, { message: "Faylda qatorlar yo'q" })
+  @ArrayMinSize(1, { message: 'val.fileNoRows' })
   @ValidateNested({ each: true })
   @Type(() => ImportProductRowDto)
   rows: ImportProductRowDto[];

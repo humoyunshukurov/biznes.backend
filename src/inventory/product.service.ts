@@ -1,9 +1,6 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppError, badRequest, conflict, notFound } from '../i18n/app-error';
+import { translate, type Lang } from '../i18n/messages';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateProductDto,
@@ -11,7 +8,11 @@ import {
   ImportProductsDto,
   UpdateProductDto,
 } from './dto/product.dto';
-import { Prisma, StockMovementType } from '../../generated/prisma/client';
+import {
+  MovementKind,
+  Prisma,
+  StockMovementType,
+} from '../../generated/prisma/client';
 
 const productInclude = {
   unit: true,
@@ -26,10 +27,9 @@ type Tx = Prisma.TransactionClient;
 function normalizeBarcodes(codes: string[]) {
   const cleaned = codes.map((c) => c.trim()).filter(Boolean);
   const unique = [...new Set(cleaned)];
-  if (unique.length === 0)
-    throw new BadRequestException('Kamida bitta shtrix-kod kiriting');
+  if (unique.length === 0) throw badRequest('val.barcodeRequired');
   if (unique.length !== cleaned.length)
-    throw new BadRequestException('Shtrix-kodlar takrorlanmasligi kerak');
+    throw badRequest('product.barcodeDuplicate');
   return unique;
 }
 
@@ -49,7 +49,7 @@ export class ProductService {
       where: { id },
       include: productInclude,
     });
-    if (!product) throw new NotFoundException('Mahsulot topilmadi');
+    if (!product) throw notFound('product.notFound');
     return product;
   }
 
@@ -67,9 +67,10 @@ export class ProductService {
     });
     if (taken.length > 0) {
       const t = taken[0];
-      throw new ConflictException(
-        `"${t.code}" shtrix-kodi "${t.product.name}" mahsulotiga biriktirilgan`,
-      );
+      throw conflict('product.barcodeTaken', {
+        code: t.code,
+        name: t.product.name,
+      });
     }
   }
 
@@ -87,9 +88,7 @@ export class ProductService {
       select: { name: true },
     });
     if (existing)
-      throw new ConflictException(
-        `"${sku}" artikuli "${existing.name}" mahsulotida ishlatilgan`,
-      );
+      throw conflict('product.skuTaken', { sku, name: existing.name });
   }
 
   async create(dto: CreateProductDto, userId: string) {
@@ -114,7 +113,7 @@ export class ProductService {
             productId: created.id,
             type: quantity > 0 ? StockMovementType.IN : StockMovementType.OUT,
             quantity: Math.abs(quantity),
-            note: "Boshlang'ich qoldiq",
+            kind: MovementKind.INITIAL,
             userId,
           },
         });
@@ -152,7 +151,7 @@ export class ProductService {
               productId: id,
               type: delta > 0 ? StockMovementType.IN : StockMovementType.OUT,
               quantity: Math.abs(delta),
-              note: 'Qoldiq tuzatildi',
+              kind: MovementKind.ADJUSTMENT,
               userId,
             },
           });
@@ -178,14 +177,13 @@ export class ProductService {
       where: { productId: id },
     });
     if (used > 0) {
-      throw new BadRequestException(
-        `Bu mahsulot ${used} ta buyurtmada ishlatilgan, uni o'chirib bo'lmaydi`,
-      );
+      throw badRequest('product.usedInOrders', { n: used });
     }
     return this.prisma.product.delete({ where: { id } });
   }
 
-  async import(dto: ImportProductsDto, userId: string) {
+  // Xato matnlari so'rov tilida qaytariladi
+  async import(dto: ImportProductsDto, userId: string, lang: Lang) {
     const result = {
       created: 0,
       updated: 0,
@@ -206,15 +204,20 @@ export class ProductService {
           else {
             result.skipped++;
             result.errors.push(
-              `${line}-qator: "${row.barcode ?? row.sku ?? row.name ?? ''}" mahsuloti topilmadi`,
+              translate(lang, 'import.rowNotFound', {
+                line,
+                ref: row.barcode ?? row.sku ?? row.name ?? '',
+              }),
             );
           }
         }
       } catch (e) {
         result.skipped++;
-        result.errors.push(
-          `${line}-qator: ${e instanceof Error ? e.message : 'xato'}`,
-        );
+        const message =
+          e instanceof AppError
+            ? e.items.map((i) => translate(lang, i.key, i.params)).join('; ')
+            : translate(lang, 'http.internal');
+        result.errors.push(translate(lang, 'import.row', { line, message }));
       }
     }
     return result;
@@ -249,7 +252,7 @@ export class ProductService {
 
   private async importCreate(row: ImportProductRowDto, userId: string) {
     const name = row.name?.trim();
-    if (!name) throw new Error("mahsulot nomi bo'sh");
+    if (!name) throw badRequest('val.nameRequired');
 
     const barcode = row.barcode?.trim() || generateEan13();
     const exists = await this.prisma.productBarcode.findUnique({

@@ -1,8 +1,5 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { conflict, unauthorized } from '../i18n/app-error';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,7 +18,7 @@ export class AuthService {
       where: { email: dto.email },
     });
     if (existing) {
-      throw new ConflictException("Bu email allaqachon ro'yxatdan o'tgan");
+      throw conflict('auth.emailTaken');
     }
 
     const password = await bcrypt.hash(dto.password, 10);
@@ -42,12 +39,12 @@ export class AuthService {
       where: { email: dto.email },
     });
     if (!user) {
-      throw new UnauthorizedException('Email yoki parol xato');
+      throw unauthorized('auth.invalidCredentials');
     }
 
     const passwordValid = await bcrypt.compare(dto.password, user.password);
     if (!passwordValid) {
-      throw new UnauthorizedException('Email yoki parol xato');
+      throw unauthorized('auth.invalidCredentials');
     }
 
     return this.signToken(user.id, user.email, user.role);
@@ -58,7 +55,7 @@ export class AuthService {
       where: { id: userId },
       select: { id: true, email: true, fullName: true, role: true },
     });
-    if (!user) throw new UnauthorizedException('Foydalanuvchi topilmadi');
+    if (!user) throw unauthorized('auth.userNotFound');
     return user;
   }
 

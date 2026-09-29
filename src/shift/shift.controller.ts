@@ -3,25 +3,32 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShiftService } from './shift.service';
 
-const userIdOf = (req: Request) => (req.user as { userId: string }).userId;
+type AuthUser = { userId: string; role: string };
+const userOf = (req: Request) => req.user as AuthUser;
 
 @UseGuards(JwtAuthGuard)
 @Controller('shifts')
 export class ShiftController {
   constructor(private shiftService: ShiftService) {}
 
+  @Get()
+  history(@Req() req: Request) {
+    const user = userOf(req);
+    return this.shiftService.history(user.userId, user.role);
+  }
+
   @Get('current')
   current(@Req() req: Request) {
-    return this.shiftService.current(userIdOf(req));
+    return this.shiftService.current(userOf(req).userId);
   }
 
   @Post('open')
   open(@Req() req: Request) {
-    return this.shiftService.open(userIdOf(req));
+    return this.shiftService.open(userOf(req).userId);
   }
 
   @Post('close')
   close(@Req() req: Request) {
-    return this.shiftService.close(userIdOf(req));
+    return this.shiftService.close(userOf(req).userId);
   }
 }

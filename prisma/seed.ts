@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import * as bcrypt from 'bcrypt';
 import {
+  MovementKind,
   PrismaClient,
   StockMovementType,
   OrderStatus,
@@ -45,6 +46,8 @@ async function main() {
   console.log('Clearing existing business data...');
   await prisma.payment.deleteMany();
   await prisma.invoice.deleteMany();
+  await prisma.customerReturnItem.deleteMany();
+  await prisma.customerReturn.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.stockMovement.deleteMany();
@@ -353,8 +356,8 @@ async function main() {
           quantity: p.stock,
           unitCost: p.cost,
           supplierId: p.cost ? supplierOf(p.cat) : null,
+          kind: p.cost ? MovementKind.SUPPLIER_IN : MovementKind.INITIAL,
           createdAt: new Date(Date.now() - 35 * 24 * 3600 * 1000),
-          note: "Boshlang'ich zaxira",
           userId: admin.id,
         },
       });
@@ -377,7 +380,6 @@ async function main() {
           supplierId,
           amount: Math.round(total * payPlan[i]),
           method: PaymentMethod.BANK_TRANSFER,
-          note: "Kirim uchun to'lov",
           userId: admin.id,
         },
       });
@@ -545,13 +547,62 @@ async function main() {
             productId: item.productId,
             type: StockMovementType.OUT,
             quantity: item.quantity,
-            note: `Buyurtma #${order.id.slice(-6)}`,
+            kind: MovementKind.ORDER,
+            orderId: order.id,
             createdAt,
             userId: admin.id,
           },
         });
       }
     }
+  }
+
+  console.log('Seeding customer returns...');
+  // Ikkita bajarilgan buyurtmadan qisman qaytarish
+  for (const index of [0, 5]) {
+    const order = await prisma.order.findUniqueOrThrow({
+      where: { id: orders[index].id },
+      include: { items: true },
+    });
+    const item = order.items[0];
+    const quantity = Math.max(1, Math.floor(item.quantity / 10));
+    const createdAt = new Date(
+      order.createdAt.getTime() + 2 * 24 * 3600 * 1000,
+    );
+    await prisma.customerReturn.create({
+      data: {
+        orderId: order.id,
+        customerId: order.customerId,
+        userId: admin.id,
+        total: Number(item.price) * quantity,
+        createdAt,
+        items: {
+          create: [
+            {
+              productId: item.productId,
+              quantity,
+              price: item.price,
+              costPrice: item.costPrice,
+            },
+          ],
+        },
+      },
+    });
+    await prisma.product.update({
+      where: { id: item.productId },
+      data: { quantity: { increment: quantity } },
+    });
+    await prisma.stockMovement.create({
+      data: {
+        productId: item.productId,
+        type: StockMovementType.IN,
+        kind: MovementKind.CUSTOMER_RETURN,
+        quantity,
+        orderId: order.id,
+        createdAt,
+        userId: admin.id,
+      },
+    });
   }
 
   console.log('Seeding invoices & payments...');
@@ -587,7 +638,6 @@ async function main() {
           invoiceId: invoice.id,
           amount: order.totalAmount,
           method: PaymentMethod.BANK_TRANSFER,
-          note: "To'liq to'lov",
         },
       });
     } else if (plan.status === InvoiceStatus.PARTIALLY_PAID) {
@@ -596,7 +646,6 @@ async function main() {
           invoiceId: invoice.id,
           amount: Number(order.totalAmount) * 0.4,
           method: PaymentMethod.CASH,
-          note: "Qisman to'lov",
         },
       });
     }

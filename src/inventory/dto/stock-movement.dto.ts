@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -19,7 +20,7 @@ export class CreateStockMovementDto {
   type: StockMovementType;
 
   @IsNumber()
-  @Min(0.001)
+  @Min(0.001, { message: 'val.quantityPositive' })
   quantity: number;
 
   @IsOptional()
@@ -33,13 +34,13 @@ export class RevisionItemDto {
 
   // Sanab chiqilgan haqiqiy qoldiq
   @IsNumber()
-  @Min(0, { message: "Haqiqiy qoldiq manfiy bo'lmasligi kerak" })
+  @Min(0, { message: 'val.actualNotNegative' })
   actual: number;
 }
 
 export class RevisionDto {
   @IsArray()
-  @ArrayMinSize(1, { message: 'Kamida bitta mahsulot sanang' })
+  @ArrayMinSize(1, { message: 'val.countAtLeastOne' })
   @ValidateNested({ each: true })
   @Type(() => RevisionItemDto)
   items: RevisionItemDto[];
@@ -47,4 +48,11 @@ export class RevisionDto {
   @IsOptional()
   @IsString()
   note?: string;
+}
+
+export class MovementQueryDto {
+  // Vergul bilan ajratilgan turlar: SUPPLIER_IN,SUPPLIER_RETURN
+  @IsOptional()
+  @Matches(/^[A-Z_]+(,[A-Z_]+)*$/)
+  kind?: string;
 }

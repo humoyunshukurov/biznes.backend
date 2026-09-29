@@ -30,6 +30,7 @@ model User {
   expenses         Expense[]
   shifts           Shift[]
   supplierPayments SupplierPayment[]
+  customerReturns  CustomerReturn[]
 }
 
 // Kompaniya, chek va printer sozlamalari (kalit -> JSON qiymat)
@@ -139,13 +140,14 @@ model Product {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  unit           Unit             @relation(fields: [unitId], references: [id])
-  category       Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  brand          Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
-  productType    ProductType?     @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
+  unit           Unit                 @relation(fields: [unitId], references: [id])
+  category       Category?            @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  brand          Brand?               @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  productType    ProductType?         @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
   barcodes       ProductBarcode[]
   stockMovements StockMovement[]
   orderItems     OrderItem[]
+  returnItems    CustomerReturnItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -167,11 +169,27 @@ enum StockMovementType {
   OUT
 }
 
+// Harakat manbai: tarix bo'limlari va izohni tilga qarab ko'rsatish uchun
+enum MovementKind {
+  MANUAL
+  INITIAL
+  ADJUSTMENT
+  ORDER
+  ORDER_CANCEL
+  ORDER_RESTORE
+  CUSTOMER_RETURN
+  SUPPLIER_IN
+  SUPPLIER_RETURN
+  REVISION
+}
+
 model StockMovement {
   id         String            @id @default(cuid())
   productId  String
   type       StockMovementType
+  kind       MovementKind      @default(MANUAL)
   quantity   Decimal           @db.Decimal(14, 3)
+  orderId    String?
   // Yetkazib beruvchidan kirim/qaytarishda bir birlik narxi
   unitCost   Decimal?          @db.Decimal(14, 2)
   supplierId String?
@@ -182,11 +200,13 @@ model StockMovement {
   product  Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   user     User      @relation(fields: [userId], references: [id])
   supplier Supplier? @relation(fields: [supplierId], references: [id])
+  order    Order?    @relation(fields: [orderId], references: [id])
 
   @@index([productId])
   @@index([userId])
   @@index([supplierId])
   @@index([createdAt])
+  @@index([kind])
 }
 
 model Customer {
@@ -200,6 +220,7 @@ model Customer {
 
   orders   Order[]
   invoices Invoice[]
+  returns  CustomerReturn[]
 }
 
 enum OrderStatus {
@@ -219,14 +240,50 @@ model Order {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  customer Customer    @relation(fields: [customerId], references: [id])
-  user     User        @relation(fields: [userId], references: [id])
-  items    OrderItem[]
-  invoices Invoice[]
+  customer       Customer         @relation(fields: [customerId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
+  items          OrderItem[]
+  invoices       Invoice[]
+  returns        CustomerReturn[]
+  stockMovements StockMovement[]
 
   @@index([customerId])
   @@index([userId])
   @@index([createdAt])
+}
+
+// Mijozdan tovar qaytarish (buyurtmaning bir qismi yoki hammasi)
+model CustomerReturn {
+  id         String   @id @default(cuid())
+  orderId    String
+  customerId String
+  userId     String
+  total      Decimal  @db.Decimal(14, 2)
+  note       String?
+  createdAt  DateTime @default(now())
+
+  order    Order                @relation(fields: [orderId], references: [id])
+  customer Customer             @relation(fields: [customerId], references: [id])
+  user     User                 @relation(fields: [userId], references: [id])
+  items    CustomerReturnItem[]
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+model CustomerReturnItem {
+  id        String   @id @default(cuid())
+  returnId  String
+  productId String
+  quantity  Int
+  price     Decimal  @db.Decimal(14, 2)
+  costPrice Decimal? @db.Decimal(14, 2)
+
+  return  CustomerReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id])
+
+  @@index([returnId])
+  @@index([productId])
 }
 
 model OrderItem {

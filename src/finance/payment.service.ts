@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest, notFound } from '../i18n/app-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/payment.dto';
 import { InvoiceStatus } from '../../generated/prisma/client';
@@ -16,11 +13,10 @@ export class PaymentService {
       where: { id: dto.invoiceId },
       include: { payments: true },
     });
-    if (!invoice) throw new NotFoundException('Hisob-faktura topilmadi');
-    if (invoice.status === InvoiceStatus.PAID)
-      throw new BadRequestException("Hisob-faktura to'liq to'langan");
+    if (!invoice) throw notFound('invoice.notFound');
+    if (invoice.status === InvoiceStatus.PAID) throw badRequest('invoice.paid');
     if (invoice.status === InvoiceStatus.CANCELLED)
-      throw new BadRequestException('Hisob-faktura bekor qilingan');
+      throw badRequest('invoice.cancelled');
 
     const paidBefore = invoice.payments.reduce(
       (sum, p) => sum + Number(p.amount),
@@ -28,9 +24,7 @@ export class PaymentService {
     );
     const remaining = Number(invoice.amount) - paidBefore;
     if (dto.amount > remaining + 0.001) {
-      throw new BadRequestException(
-        `To'lov summasi qolgan qarzdan oshmasligi kerak (qolgan: ${remaining})`,
-      );
+      throw badRequest('payment.tooMuch', { remaining });
     }
 
     return this.prisma.$transaction(async (tx) => {

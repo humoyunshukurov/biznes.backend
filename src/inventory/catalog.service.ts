@@ -1,8 +1,6 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest, notFound } from '../i18n/app-error';
+import type { MessageKey } from '../i18n/messages';
 import { PrismaService } from '../prisma/prisma.service';
 import { NamedDto, UnitDto } from './dto/catalog.dto';
 
@@ -25,7 +23,7 @@ export class CatalogService {
   async updateUnit(id: string, dto: UnitDto) {
     await this.ensure(
       this.prisma.unit.findUnique({ where: { id } }),
-      "O'lchov birligi",
+      'unit.notFound',
     );
     return this.prisma.unit.update({ where: { id }, data: dto });
   }
@@ -36,12 +34,10 @@ export class CatalogService {
         where: { id },
         include: { _count: { select: { products: true } } },
       }),
-      "O'lchov birligi",
+      'unit.notFound',
     );
     if (unit._count.products > 0) {
-      throw new BadRequestException(
-        `Bu o'lchov birligi ${unit._count.products} ta mahsulotda ishlatilgan`,
-      );
+      throw badRequest('unit.inUse', { n: unit._count.products });
     }
     return this.prisma.unit.delete({ where: { id } });
   }
@@ -58,12 +54,18 @@ export class CatalogService {
   }
 
   async updateBrand(id: string, dto: NamedDto) {
-    await this.ensure(this.prisma.brand.findUnique({ where: { id } }), 'Brend');
+    await this.ensure(
+      this.prisma.brand.findUnique({ where: { id } }),
+      'brand.notFound',
+    );
     return this.prisma.brand.update({ where: { id }, data: dto });
   }
 
   async removeBrand(id: string) {
-    await this.ensure(this.prisma.brand.findUnique({ where: { id } }), 'Brend');
+    await this.ensure(
+      this.prisma.brand.findUnique({ where: { id } }),
+      'brand.notFound',
+    );
     return this.prisma.brand.delete({ where: { id } });
   }
 
@@ -78,14 +80,17 @@ export class CatalogService {
   async removeProductType(id: string) {
     await this.ensure(
       this.prisma.productType.findUnique({ where: { id } }),
-      'Mahsulot turi',
+      'productType.notFound',
     );
     return this.prisma.productType.delete({ where: { id } });
   }
 
-  private async ensure<T>(query: Promise<T | null>, label: string): Promise<T> {
+  private async ensure<T>(
+    query: Promise<T | null>,
+    label: MessageKey,
+  ): Promise<T> {
     const found = await query;
-    if (!found) throw new NotFoundException(`${label} topilmadi`);
+    if (!found) throw notFound(label);
     return found;
   }
 }

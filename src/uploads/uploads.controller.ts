@@ -1,11 +1,11 @@
 import {
-  BadRequestException,
   Controller,
   Post,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { badRequest } from '../i18n/app-error';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { randomUUID } from 'crypto';
 import { diskStorage } from 'multer';
@@ -34,19 +34,12 @@ export class UploadsController {
         const ok =
           file.mimetype.startsWith('image/') &&
           ALLOWED_EXT.includes(extname(file.originalname).toLowerCase());
-        cb(
-          ok
-            ? null
-            : new BadRequestException(
-                'Faqat rasm (png, jpg, webp, gif) yuklash mumkin',
-              ),
-          ok,
-        );
+        cb(ok ? null : badRequest('upload.onlyImages'), ok);
       },
     }),
   )
   upload(@UploadedFile() file?: Express.Multer.File) {
-    if (!file) throw new BadRequestException('Fayl tanlanmagan');
+    if (!file) throw badRequest('upload.noFile');
     return { url: `/uploads/${file.filename}` };
   }
 }

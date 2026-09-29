@@ -1,21 +1,29 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest, notFound } from '../i18n/app-error';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateStockMovementDto, RevisionDto } from './dto/stock-movement.dto';
-import { StockMovementType } from '../../generated/prisma/client';
+import {
+  CreateStockMovementDto,
+  MovementQueryDto,
+  RevisionDto,
+} from './dto/stock-movement.dto';
+import { MovementKind, StockMovementType } from '../../generated/prisma/client';
 
 @Injectable()
 export class StockMovementService {
   constructor(private prisma: PrismaService) {}
 
-  findAll() {
+  findAll(query: MovementQueryDto) {
     return this.prisma.stockMovement.findMany({
+      where: query.kind
+        ? { kind: { in: query.kind.split(',') as MovementKind[] } }
+        : {},
       include: {
         product: { include: { unit: true } },
         user: { select: { id: true, fullName: true } },
+        supplier: { select: { id: true, name: true } },
+        order: {
+          select: { id: true, customer: { select: { name: true } } },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take: 500,
@@ -26,15 +34,16 @@ export class StockMovementService {
     const product = await this.prisma.product.findUnique({
       where: { id: dto.productId },
     });
-    if (!product) throw new NotFoundException('Mahsulot topilmadi');
+    if (!product) throw notFound('product.notFound');
 
     if (
       dto.type === StockMovementType.OUT &&
       Number(product.quantity) < dto.quantity
     ) {
-      throw new BadRequestException(
-        `Omborda yetarli qoldiq yo'q (mavjud: ${Number(product.quantity)})`,
-      );
+      throw badRequest('stock.notEnough', {
+        name: product.name,
+        available: Number(product.quantity),
+      });
     }
 
     const delta =
@@ -42,7 +51,7 @@ export class StockMovementService {
 
     const [movement] = await this.prisma.$transaction([
       this.prisma.stockMovement.create({
-        data: { ...dto, userId },
+        data: { ...dto, kind: MovementKind.MANUAL, userId },
       }),
       this.prisma.product.update({
         where: { id: dto.productId },
@@ -57,16 +66,16 @@ export class StockMovementService {
   async revision(dto: RevisionDto, userId: string) {
     const ids = [...new Set(dto.items.map((i) => i.productId))];
     if (ids.length !== dto.items.length) {
-      throw new BadRequestException('Bir mahsulot ikki marta kiritilgan');
+      throw badRequest('stock.duplicateProduct');
     }
     const products = await this.prisma.product.findMany({
       where: { id: { in: ids } },
     });
     if (products.length !== ids.length) {
-      throw new NotFoundException('Mahsulot topilmadi');
+      throw notFound('product.notFound');
     }
     const byId = new Map(products.map((p) => [p.id, p]));
-    const note = dto.note?.trim() ? `Reviziya: ${dto.note.trim()}` : 'Reviziya';
+    const note = dto.note?.trim() || null;
 
     let changed = 0;
     let surplus = 0;
@@ -85,6 +94,7 @@ export class StockMovementService {
           data: {
             productId: item.productId,
             type: delta > 0 ? StockMovementType.IN : StockMovementType.OUT,
+            kind: MovementKind.REVISION,
             quantity: Math.abs(delta),
             note,
             userId,

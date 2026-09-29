@@ -1,8 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { badRequest, notFound } from '../i18n/app-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/invoice.dto';
 import { InvoiceStatus } from '../../generated/prisma/client';
@@ -23,7 +20,7 @@ export class InvoiceService {
       where: { id },
       include: { customer: true, payments: { orderBy: { paidAt: 'desc' } } },
     });
-    if (!invoice) throw new NotFoundException('Hisob-faktura topilmadi');
+    if (!invoice) throw notFound('invoice.notFound');
     return invoice;
   }
 
@@ -31,7 +28,7 @@ export class InvoiceService {
     const customer = await this.prisma.customer.findUnique({
       where: { id: dto.customerId },
     });
-    if (!customer) throw new NotFoundException('Mijoz topilmadi');
+    if (!customer) throw notFound('customer.notFound');
     return this.prisma.invoice.create({
       data: {
         customerId: dto.customerId,
@@ -46,9 +43,7 @@ export class InvoiceService {
     const invoice = await this.findOne(id);
     if (invoice.status === InvoiceStatus.CANCELLED) return invoice;
     if (invoice.payments.length > 0) {
-      throw new BadRequestException(
-        "To'lov qilingan hisob-fakturani bekor qilib bo'lmaydi",
-      );
+      throw badRequest('invoice.hasPayments');
     }
     await this.prisma.invoice.update({
       where: { id },

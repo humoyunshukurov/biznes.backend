@@ -15,7 +15,7 @@ export class CreateInvoiceDto {
   orderId?: string;
 
   @IsNumber()
-  @Min(0.01, { message: "Summa 0 dan katta bo'lishi kerak" })
+  @Min(0.01, { message: 'val.amountPositive' })
   amount: number;
 
   @IsOptional()
