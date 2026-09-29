@@ -11,6 +11,7 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { StatsModule } from './stats/stats.module';
 import { CashModule } from './cash/cash.module';
 import { OnlineModule } from './online/online.module';
+import { PosModule } from './pos/pos.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
     StatsModule,
     CashModule,
     OnlineModule,
+    PosModule,
     SubscriptionModule,
   ],
 })

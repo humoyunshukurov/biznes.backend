@@ -350,6 +350,9 @@ model Order {
   customerId  String
   status      OrderStatus @default(NEW)
   totalAmount Decimal     @db.Decimal(14, 2)
+  // Chekka berilgan umumiy chegirma (mahsulot narxlariga taqsimlangan)
+  discount    Decimal     @default(0) @db.Decimal(14, 2)
+  note        String?
   userId      String
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt

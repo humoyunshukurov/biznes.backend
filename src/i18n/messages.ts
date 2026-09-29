@@ -418,6 +418,26 @@ export const messages = {
     en: 'Only the latest payment can be cancelled',
     ru: 'Отменить можно только последний платёж',
   },
+  'pos.shiftClosed': {
+    uz: 'Sotish uchun avval smenani oching',
+    en: 'Open a shift before selling',
+    ru: 'Откройте смену, чтобы продавать',
+  },
+  'pos.emptyCart': {
+    uz: "Chekda mahsulot yo'q",
+    en: 'The check has no products',
+    ru: 'В чеке нет товаров',
+  },
+  'pos.discountTooBig': {
+    uz: 'Chegirma chek summasidan katta',
+    en: 'The discount exceeds the check total',
+    ru: 'Скидка больше суммы чека',
+  },
+  'pos.overpaid': {
+    uz: "To'lov chek summasidan katta (chek: {total})",
+    en: 'The payment exceeds the check total (total: {total})',
+    ru: 'Оплата больше суммы чека (чек: {total})',
+  },
   'cash.notFound': {
     uz: 'Kassa yozuvi topilmadi',
     en: 'Cash record not found',
