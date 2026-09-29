@@ -10,6 +10,8 @@ import { SettingsModule } from './settings/settings.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { StatsModule } from './stats/stats.module';
 import { CashModule } from './cash/cash.module';
+import { OnlineModule } from './online/online.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { CashModule } from './cash/cash.module';
     SuppliersModule,
     StatsModule,
     CashModule,
+    OnlineModule,
+    SubscriptionModule,
   ],
 })
 export class AppModule {}

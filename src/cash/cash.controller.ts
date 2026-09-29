@@ -11,7 +11,11 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateCashDto, LedgerQueryDto } from './cash.dto';
+import {
+  CreateCashCategoryDto,
+  CreateCashDto,
+  LedgerQueryDto,
+} from './cash.dto';
 import { CashService } from './cash.service';
 
 type AuthUser = { userId: string; role: string };
@@ -35,6 +39,21 @@ export class CashController {
   @Get('categories')
   categories() {
     return this.cash.categories();
+  }
+
+  @Post('categories')
+  createCategory(@Body() dto: CreateCashCategoryDto) {
+    return this.cash.createCategory(dto);
+  }
+
+  @Delete('categories/:id')
+  removeCategory(@Param('id') id: string, @Req() req: Request) {
+    return this.cash.removeCategory(id, userOf(req).role);
+  }
+
+  @Get('customers')
+  customers() {
+    return this.cash.customers();
   }
 
   @Post()

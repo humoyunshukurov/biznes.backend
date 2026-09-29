@@ -1,6 +1,12 @@
 import { PartialType } from '@nestjs/mapped-types';
 import { EmptyToNull, Trim } from '../../common/transforms';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class CreateCustomerDto {
   @Trim()
@@ -22,6 +28,13 @@ export class CreateCustomerDto {
   @EmptyToNull()
   @IsString()
   address?: string | null;
+
+  @IsOptional()
+  @EmptyToNull()
+  @Trim()
+  @IsString()
+  @MaxLength(300)
+  note?: string | null;
 }
 
 export class UpdateCustomerDto extends PartialType(CreateCustomerDto) {}

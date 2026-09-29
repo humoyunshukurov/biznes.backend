@@ -16,11 +16,24 @@ export const defaultSettings = {
   },
   printer: { labelSize: '58x40', labelShowName: true, labelShowPrice: true },
   support: { phone: '', telegram: '' },
+  online: {
+    enabled: false,
+    showStock: true,
+    phone: '',
+    delivery: '',
+    minOrder: 0,
+  },
 };
 
 export type AppSettings = typeof defaultSettings;
 
-const SECTIONS: Section[] = ['company', 'receipt', 'printer', 'support'];
+const SECTIONS: Section[] = [
+  'company',
+  'receipt',
+  'printer',
+  'support',
+  'online',
+];
 
 @Injectable()
 export class SettingsService {

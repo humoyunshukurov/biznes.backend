@@ -338,6 +338,86 @@ export const messages = {
     en: 'Not enough money on the account (available: {available})',
     ru: 'Недостаточно средств на счёте (доступно: {available})',
   },
+  'cash.futureDate': {
+    uz: "Sana kelajakda bo'lishi mumkin emas",
+    en: 'The date cannot be in the future',
+    ru: 'Дата не может быть в будущем',
+  },
+  'cash.customerRequired': {
+    uz: 'Mijozni tanlang',
+    en: 'Choose a customer',
+    ru: 'Выберите клиента',
+  },
+  'cash.supplierRequired': {
+    uz: 'Yetkazib beruvchini tanlang',
+    en: 'Choose a supplier',
+    ru: 'Выберите поставщика',
+  },
+  'cash.customerNoDebt': {
+    uz: "Bu mijozning to'lanmagan qarzi yo'q",
+    en: 'This customer has no unpaid debt',
+    ru: 'У этого клиента нет неоплаченного долга',
+  },
+  'cash.overDebt': {
+    uz: 'Summa mijoz qarzidan katta (qarz: {debt})',
+    en: 'The amount exceeds the customer debt (debt: {debt})',
+    ru: 'Сумма больше долга клиента (долг: {debt})',
+  },
+  'cash.notDeletable': {
+    uz: "Bu yozuvni kassadan o'chirib bo'lmaydi",
+    en: 'This record cannot be deleted from the cash register',
+    ru: 'Эту запись нельзя удалить из кассы',
+  },
+  'cash.categoryNotFound': {
+    uz: 'Toifa topilmadi',
+    en: 'Category not found',
+    ru: 'Категория не найдена',
+  },
+  'online.disabled': {
+    uz: "Onlayn do'kon hozircha yopiq",
+    en: 'The online store is currently closed',
+    ru: 'Онлайн-магазин сейчас закрыт',
+  },
+  'online.emptyCart': {
+    uz: "Savat bo'sh",
+    en: 'The cart is empty',
+    ru: 'Корзина пуста',
+  },
+  'online.minOrder': {
+    uz: 'Eng kam buyurtma summasi: {amount}',
+    en: 'Minimum order amount: {amount}',
+    ru: 'Минимальная сумма заказа: {amount}',
+  },
+  'online.notFound': {
+    uz: 'Onlayn buyurtma topilmadi',
+    en: 'Online order not found',
+    ru: 'Онлайн-заказ не найден',
+  },
+  'online.alreadyHandled': {
+    uz: "Bu buyurtma allaqachon ko'rib chiqilgan",
+    en: 'This order has already been handled',
+    ru: 'Этот заказ уже обработан',
+  },
+  'online.productGone': {
+    uz: "Buyurtmadagi mahsulot o'chirilgan, buyurtmani rad eting",
+    en: 'A product in this order was deleted, please reject the order',
+    ru: 'Товар из заказа удалён, отклоните заказ',
+  },
+  'subscription.badPlan': {
+    uz: "Tarif yoki muddat noto'g'ri",
+    en: 'Invalid plan or period',
+    ru: 'Неверный тариф или срок',
+  },
+  'subscription.notFound': {
+    uz: "Obuna to'lovi topilmadi",
+    en: 'Subscription payment not found',
+    ru: 'Платёж подписки не найден',
+  },
+  'subscription.onlyLast': {
+    uz: "Faqat oxirgi to'lovni bekor qilish mumkin",
+    en: 'Only the latest payment can be cancelled',
+    ru: 'Отменить можно только последний платёж',
+  },
   'cash.notFound': {
     uz: 'Kassa yozuvi topilmadi',
     en: 'Cash record not found',

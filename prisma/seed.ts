@@ -44,6 +44,10 @@ async function main() {
   }
 
   console.log('Clearing existing business data...');
+  await prisma.onlineOrderItem.deleteMany();
+  await prisma.onlineOrder.deleteMany();
+  await prisma.cashCategory.deleteMany();
+  await prisma.subscriptionPayment.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.invoice.deleteMany();
   await prisma.customerReturnItem.deleteMany();
@@ -402,12 +406,14 @@ async function main() {
       name: 'Alisher Qodirov',
       phone: '+998 (90) 123-45-67',
       email: 'a.qodirov@toshkentmall.uz',
+      note: 'Doimiy ulgurji mijoz',
       address: "Toshkent sh., Shayxontohur t., Navoiy ko'chasi 18",
     },
     {
       name: 'Jamshid Rahimov',
       phone: '+998 (93) 890-11-22',
       email: 'info@samtrans.uz',
+      note: "Pul o'tkazma orqali to'laydi",
       address: "Samarqand sh., Gagarin ko'chasi 45",
     },
     {
@@ -664,14 +670,14 @@ async function main() {
   console.log('Seeding expenses...');
   const expenseDefs = [
     {
-      category: 'Ijara',
+      category: 'RENT',
       method: PaymentMethod.BANK_TRANSFER,
       daysAgo: 20,
       amount: 18000000,
       description: "Chilonzor omborining oylik ijara to'lovi",
     },
     {
-      category: 'Oylik maosh',
+      category: 'SALARY',
       method: PaymentMethod.CARD,
       daysAgo: 10,
       amount: 28500000,
@@ -685,7 +691,7 @@ async function main() {
       description: 'Yuk tashish va tushirish xarajatlari',
     },
     {
-      category: 'Kommunal',
+      category: 'UTILITIES',
       method: PaymentMethod.BANK_TRANSFER,
       daysAgo: 3,
       amount: 4200000,
@@ -797,6 +803,107 @@ async function main() {
       openingCash: 1500000,
       expectedCash: 1500000,
       closingCash: 1480000,
+    },
+  });
+
+  console.log('Seeding cash categories...');
+  await prisma.cashCategory.createMany({
+    data: [
+      { type: 'OUT', name: 'Logistika' },
+      { type: 'OUT', name: 'Marketing' },
+      { type: 'OUT', name: 'Bank xizmati' },
+      { type: 'IN', name: 'Ijara daromadi' },
+    ],
+  });
+
+  console.log('Seeding online store...');
+  await prisma.setting.upsert({
+    where: { key: 'online' },
+    create: {
+      key: 'online',
+      value: {
+        enabled: true,
+        showStock: true,
+        phone: '',
+        delivery: "Toshkent bo'ylab yetkazib berish 1 kun ichida",
+        minOrder: 0,
+      },
+    },
+    update: {},
+  });
+  const pick = (name: string) => {
+    const def = productDefs.find((d) => d.name === name);
+    const p = def ? products[def.sku] : undefined;
+    if (!p) throw new Error('Seed product not found: ' + name);
+    return p;
+  };
+  const onlineDefs = [
+    {
+      customerName: 'Bekzod Karimov',
+      phone: '+998 90 555 12 34',
+      address: "Toshkent, Yunusobod 4-kvartal, 12-uy",
+      note: 'Soat 14:00 dan keyin qo\'ng\'iroq qiling',
+      hoursAgo: 2,
+      status: 'NEW' as const,
+      items: [
+        ['Portland Sement M400 (50kg)', 10],
+        ['Gruntovka Ceresit CT 17 (5L)', 2],
+      ] as [string, number][],
+    },
+    {
+      customerName: 'Alisher Qodirov',
+      phone: '+998 (90) 123-45-67',
+      address: null,
+      note: null,
+      hoursAgo: 5,
+      status: 'NEW' as const,
+      items: [['Laminat AC4 12mm', 20]] as [string, number][],
+    },
+    {
+      customerName: 'Otabek Ergashev',
+      phone: '+998 93 111 22 33',
+      address: 'Chirchiq',
+      note: null,
+      hoursAgo: 30,
+      status: 'REJECTED' as const,
+      items: [['Gazoblok D500 (600x300x200)', 5]] as [string, number][],
+    },
+  ];
+  for (const o of onlineDefs) {
+    const items = o.items.map(([name, quantity]) => {
+      const p = pick(name);
+      return { productId: p.id, name, quantity, price: p.price };
+    });
+    await prisma.onlineOrder.create({
+      data: {
+        customerName: o.customerName,
+        phone: o.phone,
+        address: o.address,
+        note: o.note,
+        status: o.status,
+        rejectReason: o.status === 'REJECTED' ? "Mijoz bilan bog'lanib bo'lmadi" : null,
+        handledById: o.status === 'REJECTED' ? admin.id : null,
+        handledAt: o.status === 'REJECTED' ? new Date() : null,
+        total: items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+        createdAt: new Date(Date.now() - o.hoursAgo * 3600 * 1000),
+        items: { create: items },
+      },
+    });
+  }
+
+  console.log('Seeding subscription...');
+  const subStart = new Date(Date.now() - 20 * DAY_MS);
+  const subEnd = new Date(subStart);
+  subEnd.setMonth(subEnd.getMonth() + 1);
+  await prisma.subscriptionPayment.create({
+    data: {
+      plan: 'BUSINESS',
+      months: 1,
+      amount: 299000,
+      method: PaymentMethod.CARD,
+      periodStart: subStart,
+      periodEnd: subEnd,
+      userId: admin.id,
     },
   });
 

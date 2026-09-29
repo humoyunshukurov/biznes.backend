@@ -2,7 +2,10 @@ import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsNumber,
   IsOptional,
+  Max,
+  Min,
   IsString,
   MaxLength,
   ValidateNested,
@@ -35,6 +38,15 @@ export class SupportSettingsDto {
   @IsOptional() @Trim() @IsString() @MaxLength(100) telegram?: string;
 }
 
+// Onlayn do'kon: mijozlar havola orqali katalogni ko'rib buyurtma beradi
+export class OnlineSettingsDto {
+  @IsOptional() @IsBoolean() enabled?: boolean;
+  @IsOptional() @IsBoolean() showStock?: boolean;
+  @IsOptional() @Trim() @IsString() @MaxLength(40) phone?: string;
+  @IsOptional() @Trim() @IsString() @MaxLength(300) delivery?: string;
+  @IsOptional() @IsNumber() @Min(0) @Max(1_000_000_000) minOrder?: number;
+}
+
 export class UpdateSettingsDto {
   @IsOptional()
   @ValidateNested()
@@ -55,4 +67,9 @@ export class UpdateSettingsDto {
   @ValidateNested()
   @Type(() => SupportSettingsDto)
   support?: SupportSettingsDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => OnlineSettingsDto)
+  online?: OnlineSettingsDto;
 }

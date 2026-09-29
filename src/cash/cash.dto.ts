@@ -8,9 +8,30 @@ import {
   IsString,
   MaxLength,
   Min,
+  MinLength,
 } from 'class-validator';
 import { CashType, PaymentMethod } from '../../generated/prisma/client';
 import { EmptyToNull, Trim } from '../common/transforms';
+
+// Maxsus toifalar: mijoz qarzini yopish va yetkazib beruvchi bilan hisob-kitob
+export const CLIENT = 'CLIENT';
+export const SUPPLIER = 'SUPPLIER';
+
+// Tayyor toifalar kodlari (nomi interfeysda tanlangan tilga tarjima qilinadi)
+export const PRESET_CATEGORIES: Record<'IN' | 'OUT', string[]> = {
+  IN: [CLIENT, SUPPLIER, 'SALES', 'OPENING', 'LOAN', 'OTHER_IN'],
+  OUT: [
+    SUPPLIER,
+    'SALARY',
+    'ADVANCE',
+    'FUEL',
+    'RENT',
+    'UTILITIES',
+    'COLLECTION',
+    'PURCHASE',
+    'OTHER_OUT',
+  ],
+};
 
 export class CreateCashDto {
   @IsEnum(CashType)
@@ -36,10 +57,37 @@ export class CreateCashDto {
 
   @IsOptional()
   @EmptyToNull()
+  @IsString()
+  customerId?: string | null;
+
+  @IsOptional()
+  @EmptyToNull()
+  @IsString()
+  supplierId?: string | null;
+
+  // Yozuv sanasi (bo'lmasa - hozirgi vaqt)
+  @IsOptional()
+  @EmptyToNull()
+  @IsDateString()
+  date?: string | null;
+
+  @IsOptional()
+  @EmptyToNull()
   @Trim()
   @IsString()
   @MaxLength(300)
   description?: string | null;
+}
+
+export class CreateCashCategoryDto {
+  @IsIn(['IN', 'OUT'])
+  type: 'IN' | 'OUT';
+
+  @Trim()
+  @IsString()
+  @MinLength(1, { message: 'val.nameRequired' })
+  @MaxLength(80)
+  name: string;
 }
 
 export class LedgerQueryDto {

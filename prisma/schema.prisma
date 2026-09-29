@@ -33,6 +33,8 @@ model User {
   customerReturns  CustomerReturn[]
   payments         Payment[]
   cashTransactions CashTransaction[]
+  onlineOrders     OnlineOrder[]
+  subscriptionPays SubscriptionPayment[]
 }
 
 enum CashType {
@@ -60,6 +62,79 @@ model CashTransaction {
   user User @relation(fields: [userId], references: [id])
 
   @@index([createdAt])
+}
+
+// Kassa kirim/chiqim toifalari: foydalanuvchi qo'shgan (tayyor toifalar kod bilan saqlanadi)
+model CashCategory {
+  id        String   @id @default(cuid())
+  type      CashType
+  name      String
+  createdAt DateTime @default(now())
+
+  @@unique([type, name])
+}
+
+enum OnlineOrderStatus {
+  NEW
+  ACCEPTED
+  REJECTED
+}
+
+// Onlayn do'kon orqali mijoz yuborgan buyurtma (qabul qilinganda oddiy buyurtmaga aylanadi)
+model OnlineOrder {
+  id           String            @id @default(cuid())
+  number       Int               @unique @default(autoincrement())
+  customerName String
+  phone        String
+  address      String?
+  note         String?
+  total        Decimal           @db.Decimal(14, 2)
+  status       OnlineOrderStatus @default(NEW)
+  rejectReason String?
+  orderId      String?           @unique
+  handledById  String?
+  handledAt    DateTime?
+  createdAt    DateTime          @default(now())
+
+  items     OnlineOrderItem[]
+  order     Order?            @relation(fields: [orderId], references: [id])
+  handledBy User?             @relation(fields: [handledById], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OnlineOrderItem {
+  id            String  @id @default(cuid())
+  onlineOrderId String
+  productId     String?
+  // Buyurtma paytidagi nom va narx (mahsulot keyin o'zgarsa ham saqlanadi)
+  name          String
+  quantity      Int
+  price         Decimal @db.Decimal(14, 2)
+
+  onlineOrder OnlineOrder @relation(fields: [onlineOrderId], references: [id], onDelete: Cascade)
+  product     Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([onlineOrderId])
+}
+
+// Dastur obunasi uchun to'lovlar: har biri obuna muddatini uzaytiradi
+model SubscriptionPayment {
+  id          String        @id @default(cuid())
+  plan        String
+  months      Int
+  amount      Decimal       @db.Decimal(14, 2)
+  method      PaymentMethod
+  periodStart DateTime
+  periodEnd   DateTime
+  note        String?
+  userId      String
+  createdAt   DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([periodEnd])
 }
 
 // Kompaniya, chek va printer sozlamalari (kalit -> JSON qiymat)
@@ -185,6 +260,7 @@ model Product {
   stockMovements StockMovement[]
   orderItems     OrderItem[]
   returnItems    CustomerReturnItem[]
+  onlineItems    OnlineOrderItem[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -252,6 +328,7 @@ model Customer {
   phone     String
   email     String?
   address   String?
+  note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -283,6 +360,7 @@ model Order {
   invoices       Invoice[]
   returns        CustomerReturn[]
   stockMovements StockMovement[]
+  onlineOrder    OnlineOrder?
 
   @@index([customerId])
   @@index([userId])
