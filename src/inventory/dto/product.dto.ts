@@ -82,9 +82,10 @@ export class CreateProductDto {
   @IsIn([0, 12, null])
   vatRate?: number | null;
 
+  // Tan narxidan past sotilganda manfiy bo'lishi mumkin (chegirma/zarar bilan sotish)
   @IsOptional()
   @IsNumber()
-  @Min(0)
+  @Min(-100)
   @Max(10000)
   markupPercent?: number | null;
 
